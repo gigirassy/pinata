@@ -6,7 +6,12 @@ Self-explanatory. It's built with the idea of being light as possible, and shame
 
 The Docker image, built by you, ranges between 5-7 MB, and the entire workings depend on a single main.go.
 
-Pinata takes very little memory to run, about 8MB of memory with an Alpine docker image.
+Pinata takes very little memory to run, about 7MB of memory with an Alpine docker image when active, and 1MB when idle.
+
+Despite being so light, Pinata supports bookmarks (encrypted!) and can be made a PWA on your phone.
+
+
+**Contribute to <a href="https://codeberg.org/gigirassy/pinata/">this repo on Codeberg</a>! While the image is hosted on a Github mirror, the code itself is edited on Codeberg!!**
 
 ## How to run
 
