@@ -2,7 +2,7 @@
 #
 # Multi-arch build (use BuildKit/docker buildx). Produces a tiny scratch image.
 #
-FROM --platform=$BUILDPLATFORM golang:1.24.7-alpine AS builder
+FROM --platform=$BUILDPLATFORM golang:1.24.8-alpine AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
