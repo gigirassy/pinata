@@ -15,6 +15,7 @@ Pinata takes very little memory to run, about 8MB of memory with an Alpine docke
 Port 8080 is needed to run with this method; Docker is most recommended if that is taken.
 
 * Clone this repo.
+* (optional, but bookmarks will be unavailable) ``head -c 32 /dev/urandom | base64`` and then ``export PINATA_BOOKMARK_KEY=resultofpreviouscommand``.
 * ``go build -trimpath -ldflags="-s -w" -o pinata ./main.go``
 * Wait a few seconds for that tasty binary.
 * Run in background with ``./pinata &``
@@ -22,6 +23,6 @@ Port 8080 is needed to run with this method; Docker is most recommended if that 
 ### Docker Compose (recommended)
 
 * Clone this repo.
-* Tweak ``compose.yml`` as you see fit.
+* Tweak ``compose.yml`` as you see fit and follow instructions if you want to enable bookmarks.
 * ``sudo docker compose up -d`` to build and run.
 * Need to update? ``git pull && docker compose up -d --build``

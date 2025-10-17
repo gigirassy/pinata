@@ -1,7 +1,12 @@
-version: "3.8"
 services:
   pinata:
     build: .
     ports:
       - "127.0.0.1:8080:8080"
+    environment:
+      # Set this to a key generated with the "head -c 32 /dev/urandom | base64" command if you want to enable bookmarks for users; this allows cookies to be encrypted so you'll never see their searches.
+      - PINATA_BOOKMARK_KEY=
+      # The reverse image search uses Tineye, which often requires Cloudflare! If you aren't comfortable with it, set this variable to 0.
+      - PINATA_DISABLE_REVERSE=1
     restart: unless-stopped
+
