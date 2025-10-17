@@ -235,7 +235,7 @@ button[type="submit"],.btn-save{background:linear-gradient(90deg,var(--accent),#
 
 // Static index page (no JS). Bookmarks rendered server-side only here.
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf8")
 	// header and intro
 	io.WriteString(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pinata - Search</title><link rel="stylesheet" href="/static/style.css"></head><body>`)
 	io.WriteString(w, `<div class="header"><a class="brand" href="/">Pinata</a><div class="search-box"></div></div>`)
@@ -504,7 +504,7 @@ func imageProxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed", http.StatusBadGateway)
 		return
 	}
-	req.Header.Set("User-Agent", "PinataGo/1.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:144.0) Gecko/20100101 Firefox/144.0")
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		http.Error(w, "failed to fetch", http.StatusBadGateway)
