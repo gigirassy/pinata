@@ -20,9 +20,7 @@ import (
 	"time"
 )
 
-// --------------------------------------------------------------------
-// Configuration: HTTP client and buffer pool (memory tuned)
-// --------------------------------------------------------------------
+// ---------- tuned HTTP client and buffer pool ----------
 var httpClient = &http.Client{
 	Timeout: 15 * time.Second,
 	Transport: &http.Transport{
@@ -39,7 +37,7 @@ var httpClient = &http.Client{
 
 var copyBufPool = sync.Pool{
 	New: func() any {
-		b := make([]byte, 32*1024) // 32KB buffer reused
+		b := make([]byte, 32*1024) // 32KB
 		return &b
 	},
 }
@@ -47,9 +45,7 @@ var copyBufPool = sync.Pool{
 const pinterestSearchURL = "https://www.pinterest.com/resource/BaseSearchResource/get/"
 const cookieName = "pinata_bm"
 
-// --------------------------------------------------------------------
-// Bookmarks: types, key, limits
-// --------------------------------------------------------------------
+// ---------- bookmarks types / config ----------
 type BookmarkEntry struct {
 	Type  string `json:"type"`  // "q" or "img"
 	Value string `json:"value"` // query or image URL
@@ -62,13 +58,9 @@ var disableReverse bool
 const maxBookmarks = 30
 const maxItemLen = 256
 
-// --------------------------------------------------------------------
-// init: read env variables
-// - PINATA_BOOKMARK_KEY: base64 32-byte key to enable bookmarks
-// - PINATA_DISABLE_REVERSE: "1"/"true"/"yes" disables reverse search link
-// --------------------------------------------------------------------
+// ---------- init: read env ----------
 func init() {
-	// PINATA_BOOKMARK_KEY
+	// PINATA_BOOKMARK_KEY: base64 32-byte key
 	if kb := os.Getenv("PINATA_BOOKMARK_KEY"); kb != "" {
 		if decoded, err := base64.StdEncoding.DecodeString(kb); err == nil && len(decoded) == 32 {
 			bookmarkKey = decoded
@@ -76,14 +68,14 @@ func init() {
 			log.Println("Bookmarking enabled")
 		} else {
 			bookmarkingEnabled = false
-			log.Println("PINATA_BOOKMARK_KEY provided but invalid; bookmarking disabled")
+			log.Println("PINATA_BOOKMARK_KEY present but invalid; bookmarking disabled")
 		}
 	} else {
 		bookmarkingEnabled = false
 		log.Println("PINATA_BOOKMARK_KEY not set; bookmarking disabled")
 	}
 
-	// PINATA_DISABLE_REVERSE
+	// PINATA_DISABLE_REVERSE: "1"/"true"/"yes" disables reverse search
 	switch strings.ToLower(strings.TrimSpace(os.Getenv("PINATA_DISABLE_REVERSE"))) {
 	case "1", "true", "yes":
 		disableReverse = true
@@ -93,9 +85,7 @@ func init() {
 	}
 }
 
-// --------------------------------------------------------------------
-// Encryption helpers for cookie storage (AES-GCM)
-// --------------------------------------------------------------------
+// ---------- encryption helpers (AES-GCM) ----------
 func encryptBookmarks(entries []BookmarkEntry) (string, error) {
 	if !bookmarkingEnabled {
 		return "", nil
@@ -146,12 +136,12 @@ func decryptBookmarks(encoded string) ([]BookmarkEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	// Try new format ([]BookmarkEntry)
+	// try new format first ([]BookmarkEntry)
 	var entries []BookmarkEntry
 	if err := json.Unmarshal(plain, &entries); err == nil {
 		return entries, nil
 	}
-	// Fallback to legacy []string -> convert to type "q"
+	// fallback to legacy []string
 	var arr []string
 	if err := json.Unmarshal(plain, &arr); err == nil {
 		out := make([]BookmarkEntry, 0, len(arr))
@@ -163,9 +153,7 @@ func decryptBookmarks(encoded string) ([]BookmarkEntry, error) {
 	return nil, io.ErrUnexpectedEOF
 }
 
-// --------------------------------------------------------------------
-// Cookie helpers: read, set, clear
-// --------------------------------------------------------------------
+// ---------- cookie helpers ----------
 func readBookmarksFromReq(r *http.Request) []BookmarkEntry {
 	if !bookmarkingEnabled {
 		return nil
@@ -176,7 +164,6 @@ func readBookmarksFromReq(r *http.Request) []BookmarkEntry {
 	}
 	entries, err := decryptBookmarks(c.Value)
 	if err != nil {
-		// invalid cookie -> ignore
 		return nil
 	}
 	return entries
@@ -196,14 +183,14 @@ func setBookmarksCookie(w http.ResponseWriter, entries []BookmarkEntry) {
 		if len(v) > maxItemLen {
 			v = v[:maxItemLen]
 		}
+		if e.Type != "q" && e.Type != "img" {
+			e.Type = "q"
+		}
 		key := e.Type + "|" + v
 		if seen[key] {
 			continue
 		}
 		seen[key] = true
-		if e.Type != "q" && e.Type != "img" {
-			e.Type = "q"
-		}
 		out = append(out, BookmarkEntry{Type: e.Type, Value: v})
 		if len(out) >= maxBookmarks {
 			break
@@ -211,7 +198,6 @@ func setBookmarksCookie(w http.ResponseWriter, entries []BookmarkEntry) {
 	}
 	enc, err := encryptBookmarks(out)
 	if err != nil {
-		// fail silently
 		return
 	}
 	c := &http.Cookie{
@@ -220,7 +206,7 @@ func setBookmarksCookie(w http.ResponseWriter, entries []BookmarkEntry) {
 		Path:     "/",
 		HttpOnly: true,
 		SameSite: http.SameSiteLaxMode,
-		// Secure: true, // enable when serving over HTTPS
+		// Secure: true, // enable in production with HTTPS
 		MaxAge: 60 * 60 * 24 * 365 * 10,
 	}
 	http.SetCookie(w, c)
@@ -237,9 +223,7 @@ func clearBookmarksCookie(w http.ResponseWriter) {
 	http.SetCookie(w, c)
 }
 
-// --------------------------------------------------------------------
-// Stylesheet and minimal HTML templates (no JS)
-// --------------------------------------------------------------------
+// ---------- CSS and HTML (no JS) ----------
 const cssContent = `
 :root{--bg:#0b0f17;--muted:#94a3b8;--text:#e6e6ff;--accent:#7c3aed;--card-shadow:rgba(0,0,0,0.6)}
 *{box-sizing:border-box}html,body{height:100%}body{margin:0;padding:20px;background:linear-gradient(180deg,#071020 0%,#0b0f17 100%);color:var(--text);font-family:ui-monospace,Menlo,Monaco,monospace}
@@ -270,52 +254,19 @@ button[type="submit"],.btn-save{background:linear-gradient(90deg,var(--accent),#
 @media (max-width:640px){ body{padding:12px;font-size:18px} .brand{font-size:22px} input[type="text"]{min-width:120px;padding:12px 14px;font-size:16px} button[type="submit"],.btn-save{padding:10px 14px;font-size:16px;border-radius:10px} .img-container{column-width:180px;column-gap:12px} .search-block{gap:10px;flex-direction:column} .search-inline{width:100%} .search-box{margin-left:0;width:100%} .bookmarks{order:3;width:100%;margin-top:8px} }
 `
 
-<<<<<<< HEAD
-// Static index page (no JS). Bookmarks rendered server-side only here.
-func indexHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf8")
-	// header and intro
-	io.WriteString(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pinata - Search</title><link rel="stylesheet" href="/static/style.css"></head><body>`)
-	io.WriteString(w, `<div class="header"><a class="brand" href="/">Pinata</a><div class="search-box"></div></div>`)
-	io.WriteString(w, `<div style="color:#94a3b8; margin-bottom:12px;">Search images from Pinterest — submit a search to view results.</div>`)
-	// search block
-	io.WriteString(w, `<form class="search-block" method="get" action="/search"><input type="text" name="q" placeholder="Search Image" required maxlength="64"><button type="submit">Search</button></form>`)
-
-	// bookmarks area (server-rendered)
-	if bookmarkingEnabled {
-		items := readBookmarksFromReq(r)
-		io.WriteString(w, `<div class="bookmarks"><div style="font-size:14px;color:var(--muted);margin-top:8px">Saved searches</div><div class="bookmark-list">`)
-		for _, q := range items {
-			escaped := html.EscapeString(q)
-			// Each bookmark pill: link to /search?q=... and a small form to remove
-			io.WriteString(w, `<span class="bookmark-pill"><a href="/search?q=`+url.QueryEscape(q)+`">`+escaped+`</a>`)
-			// remove form
-			io.WriteString(w, `<form method="post" action="/bookmark_remove" style="display:inline;margin:0 0 0 6px;"><input type="hidden" name="q" value="`+html.EscapeString(q)+`"><button class="bookmark-remove-btn" type="submit" title="Remove">✕</button></form></span>`)
-		}
-		io.WriteString(w, `</div></div>`)
-	}
-
-	io.WriteString(w, `<div class="footer-note">Powered by Pinata • Reverse search via Tineye</div></body></html>`)
-=======
-// --------------------------------------------------------------------
-// Handlers
-// --------------------------------------------------------------------
+// ---------- handlers ----------
 func styleHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/css; charset=utf-8")
 	_, _ = io.WriteString(w, cssContent)
->>>>>>> cc7ebb9 (image bookmarking, bookmarks export/import)
 }
 
-// Index (front page) - server-rendered bookmarks and import/export forms
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	// header and search block
 	_, _ = io.WriteString(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pinata - Search</title><link rel="stylesheet" href="/static/style.css"></head><body>`)
 	_, _ = io.WriteString(w, `<div class="header"><a class="brand" href="/">Pinata</a><div class="search-box"></div></div>`)
 	_, _ = io.WriteString(w, `<div style="color:#94a3b8; margin-bottom:12px;">Search images from Pinterest — submit a search to view results.</div>`)
 	_, _ = io.WriteString(w, `<form class="search-block" method="get" action="/search"><input type="text" name="q" placeholder="Search Image" required maxlength="64"><button type="submit">Search</button></form>`)
 
-	// bookmarks shown only on index
 	if bookmarkingEnabled {
 		items := readBookmarksFromReq(r)
 		_, _ = io.WriteString(w, `<div class="bookmarks"><div style="font-size:14px;color:var(--muted);margin-top:8px">Saved bookmarks</div><div class="bookmark-list">`)
@@ -330,7 +281,6 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		_, _ = io.WriteString(w, `</div>`)
 
-		// export and import
 		_, _ = io.WriteString(w, `<div class="export-form"><form method="get" action="/bookmarks/export"><button type="submit" class="btn-save">Export JSON</button></form>`)
 		_, _ = io.WriteString(w, `<form method="post" action="/bookmarks/import" enctype="multipart/form-data" style="margin-left:8px;"><input type="file" name="file" accept="application/json" required><button type="submit" class="btn-save" style="margin-left:8px">Import JSON</button></form></div>`)
 		_, _ = io.WriteString(w, `</div>`)
@@ -339,7 +289,6 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, `<div class="footer-note">Powered by Pinata • Reverse search via Tineye</div></body></html>`)
 }
 
-// Streaming search handler (no JS). Writes cards as results are decoded.
 func searchHandler(w http.ResponseWriter, r *http.Request) {
 	q := strings.TrimSpace(r.URL.Query().Get("q"))
 	if len(q) < 1 || len(q) > 64 {
@@ -394,10 +343,8 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// Start streaming HTML
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>`+html.EscapeString(q)+` - Pinata</title><link rel="stylesheet" href="/static/style.css"></head><body>`)
-	// header: inline search and Save-search form
 	_, _ = io.WriteString(w, `<div class="header" style="margin-bottom:8px;"><a class="brand" href="/">Pinata</a><div class="search-box">`)
 	_, _ = io.WriteString(w, `<form class="search-inline" method="get" action="/search"><input type="text" name="q" value="`+html.EscapeString(q)+`" maxlength="64"><button type="submit">Search</button></form>`)
 	if bookmarkingEnabled {
@@ -426,12 +373,12 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 		switch key {
 		case "results":
-			t, err := dec.Token()
+			tk2, err := dec.Token()
 			if err != nil {
 				log.Printf("unexpected json after results: %v", err)
 				continue
 			}
-			if delim, ok := t.(json.Delim); !ok || delim != '[' {
+			if delim, ok := tk2.(json.Delim); !ok || delim != '[' {
 				continue
 			}
 			var rObj struct {
@@ -453,7 +400,6 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 				esc := url.QueryEscape(u)
 				b64 := base64.StdEncoding.EncodeToString([]byte(u))
 
-				// Write card (with magnifier optional and Save image form)
 				_, _ = io.WriteString(w, `<div class="card">`)
 				_, _ = io.WriteString(w, `<a href="/image_proxy?url=`+esc+`" style="display:block;"><img loading="lazy" src="/image_proxy?url=`+esc+`" alt="image"></a>`)
 				_, _ = io.WriteString(w, `<div class="card-controls">`)
@@ -464,18 +410,17 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 					next := "/search?q=" + url.QueryEscape(q)
 					_, _ = io.WriteString(w, `<form method="post" action="/bookmark_image" style="display:inline;margin:0;"><input type="hidden" name="url" value="`+html.EscapeString(u)+`"><input type="hidden" name="next" value="`+html.EscapeString(next)+`"><button class="btn-save-mini" type="submit" title="Save image">❤</button></form>`)
 				}
-				_, _ = io.WriteString(w, `</div>`) // card-controls
-				_, _ = io.WriteString(w, `</div>`) // card
-
+				_, _ = io.WriteString(w, `</div>`)
+				_, _ = io.WriteString(w, `</div>`)
 				if f, ok := w.(http.Flusher); ok {
 					f.Flush()
 				}
 			}
 			_, _ = dec.Token()
 		case "bookmark":
-			t, err := dec.Token()
+			tk2, err := dec.Token()
 			if err == nil {
-				if s, ok := t.(string); ok {
+				if s, ok := tk2.(string); ok {
 					nextBookmark = s
 				}
 			}
@@ -484,7 +429,6 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	// finish results
 	_, _ = io.WriteString(w, `</div>`)
 	if nextBookmark != "" {
 		qenc := url.QueryEscape(q)
@@ -501,10 +445,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	_, _ = io.WriteString(w, `<div class="footer-note">Powered by Pinata • Reverse search via Tineye</div></body></html>`)
 }
 
-// --------------------------------------------------------------------
-// Bookmark endpoints (server-side, no JS)
-// --------------------------------------------------------------------
-
+// ---------- bookmark handlers ----------
 func bookmarkPostHandler(w http.ResponseWriter, r *http.Request) {
 	if !bookmarkingEnabled {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -696,9 +637,7 @@ func bookmarksImportHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-// --------------------------------------------------------------------
-// Image proxy and reverse search
-// --------------------------------------------------------------------
+// ---------- image proxy & revsearch ----------
 func imageProxyHandler(w http.ResponseWriter, r *http.Request) {
 	uq := r.URL.Query().Get("url")
 	if uq == "" {
@@ -761,9 +700,7 @@ func revsearchHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, tineye, http.StatusSeeOther)
 }
 
-// --------------------------------------------------------------------
-// main: route setup
-// --------------------------------------------------------------------
+// ---------- main ----------
 func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/static/style.css", styleHandler)
@@ -785,8 +722,9 @@ func main() {
 		ReadTimeout:  12 * time.Second,
 		WriteTimeout: 30 * time.Second,
 		IdleTimeout:  60 * time.Second,
+		BaseContext: func(net.Listener) context.Context { return context.Background() },
 	}
 
-	log.Println("Pinata listening on :8080. Bookmarking enabled:", bookmarkingEnabled, " Reverse disabled:", disableReverse)
+	log.Println("Pinata listening on :8080 (no-JS mode). Bookmarking enabled:", bookmarkingEnabled, " Reverse disabled:", disableReverse)
 	log.Fatal(server.ListenAndServe())
 }
