@@ -29,5 +29,5 @@ Port 8080 is needed to run with this method; Docker is most recommended if that 
 
 * Clone this repo.
 * Tweak ``compose.yml`` as you see fit and follow instructions if you want to enable bookmarks.
-* ``sudo docker compose up -d`` to build and run.
-* Need to update? ``git pull && docker compose up -d --build``
+* ``docker compose up -d``
+* ``docker compose pull && docker compose up -d`` to update.
