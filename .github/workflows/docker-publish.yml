@@ -16,7 +16,7 @@ jobs:
     outputs:
       tag: ${{ steps.set_tag.outputs.TAG }}
     steps:
-      - name: Checkout (full)
+      - name: Checkout (full history required for tagging)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -67,14 +67,15 @@ jobs:
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
             go build -o ${OUT}/pinata-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} ./
 
-      - name: Package (linux example)
+      - name: Package (example for linux)
         if: matrix.goos == 'linux'
         run: |
           tar -czf pinata-${{ matrix.goos }}-${{ matrix.goarch }}.tar.gz build-artifacts/pinata-${{ matrix.goos }}-${{ matrix.goarch }}
 
-      - name: Upload artifacts to Release
-        uses: softprops/action-gh-release@v1
+      - name: Upload artifacts to the Release
+        uses: ncipollo/release-action@v1
         with:
+          tag: ${{ needs.prepare_release.outputs.tag }}
           files: |
             build-artifacts/*
             *.tar.gz
