@@ -74,7 +74,7 @@ jobs:
           OUT_DIR=build-artifacts
           mkdir -p ${OUT_DIR}
           GOOS=${{ matrix.goos }} GOARCH=${{ matrix.goarch }} \
-            go build -o ${OUT_DIR}/pinata-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} ./cmd/pinata
+            go build -o ${OUT_DIR}/pinata-${{ matrix.goos }}-${{ matrix.goarch }}${EXT} ./
 
       - name: Package artifact (tar/gzip)
         if: matrix.goos == 'linux'
