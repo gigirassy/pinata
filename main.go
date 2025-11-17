@@ -256,7 +256,7 @@ button[type="submit"],.btn-save{background:linear-gradient(90deg,var(--accent),#
 
 // ---------- handlers ----------
 func styleHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Content-Type", "text/css; charset=utf8")
 	_, _ = io.WriteString(w, cssContent)
 }
 
@@ -645,24 +645,47 @@ func imageProxyHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	orig, err := url.QueryUnescape(uq)
-	if err != nil || !(strings.HasPrefix(orig, "http://") || strings.HasPrefix(orig, "https://")) {
+	if err != nil {
 		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
 	}
+
+	parsed, err := url.Parse(orig)
+	if err != nil {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+
+	// Require https scheme
+	if parsed.Scheme != "https" {
+		http.Error(w, "proxy allowed for https only", http.StatusForbidden)
+		return
+	}
+
+	// Require exact host i.pinimg.com (case insensitive)
+	if !strings.EqualFold(parsed.Hostname(), "i.pinimg.com") {
+		http.Error(w, "proxy allowed only for i.pinimg.com", http.StatusForbidden)
+		return
+	}
+
+	// Build request with timeout
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", orig, nil)
+	req, err := http.NewRequestWithContext(ctx, "GET", parsed.String(), nil)
 	if err != nil {
 		http.Error(w, "failed", http.StatusBadGateway)
 		return
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:144.0) Gecko/20100101 Firefox/144.0")
+	req.Header.Set("User-Agent", "PinataGo/1.0")
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		http.Error(w, "failed to fetch", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
+
+	// Copy select headers and stream body using pooled buffer
 	if ct := resp.Header.Get("Content-Type"); ct != "" {
 		w.Header().Set("Content-Type", ct)
 	}
@@ -670,11 +693,13 @@ func imageProxyHandler(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Cache-Control", cc)
 	}
 	w.WriteHeader(resp.StatusCode)
+
 	bufPtr := copyBufPool.Get().(*[]byte)
 	buf := *bufPtr
 	_, _ = io.CopyBuffer(w, resp.Body, buf)
 	copyBufPool.Put(bufPtr)
 }
+
 
 func revsearchHandler(w http.ResponseWriter, r *http.Request) {
 	if disableReverse {
