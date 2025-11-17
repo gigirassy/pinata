@@ -261,7 +261,7 @@ func styleHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func indexHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf8")
 	_, _ = io.WriteString(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pinata - Search</title><link rel="stylesheet" href="/static/style.css"></head><body>`)
 	_, _ = io.WriteString(w, `<div class="header"><a class="brand" href="/">Pinata</a><div class="search-box"></div></div>`)
 	_, _ = io.WriteString(w, `<div style="color:#94a3b8; margin-bottom:12px;">Search images from Pinterest — submit a search to view results.</div>`)
@@ -676,7 +676,7 @@ func imageProxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed", http.StatusBadGateway)
 		return
 	}
-	req.Header.Set("User-Agent", "PinataGo/1.0")
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
