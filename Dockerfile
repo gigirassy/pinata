@@ -7,7 +7,7 @@ ARG TARGETVARIANT
 WORKDIR /src
 
 # cache go mod download between builds (requires BuildKit)
-COPY go.mod go.sum ./
+COPY go.mod ./
 RUN apk add --no-cache ca-certificates git
 RUN --mount=type=cache,target=/root/.cache/go-build \
     --mount=type=cache,target=/go/pkg/mod \
