@@ -12,8 +12,8 @@ COPY . .
 RUN rm -rf screenies .github
 
 RUN CGO_ENABLED=0 \
-    GOOS=${TARGETOS:-linux} \
-    GOARCH=${TARGETARCH:-amd64} \
+    GOOS=${TARGETOS} \
+    GOARCH=${TARGETARCH} \
     go build -trimpath \
       -buildmode=pie \
       -ldflags="-s -w -buildid='' -extldflags '-static'" \
