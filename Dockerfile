@@ -5,7 +5,7 @@ ARG TARGETARCH
 
 WORKDIR /src
 COPY go.mod ./
-RUN apk add --no-cache ca-certificates git \
+RUN apk add --no-cache ca-certificates git binutils \
     && go mod download
 
 COPY . .
