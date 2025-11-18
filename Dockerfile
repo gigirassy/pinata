@@ -4,7 +4,7 @@ ARG TARGETOS
 ARG TARGETARCH
 
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY go.mod ./
 RUN apk add --no-cache ca-certificates git \
     && go mod download
 
