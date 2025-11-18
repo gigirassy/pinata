@@ -9,7 +9,6 @@ COPY go.mod ./
 RUN apk add --no-cache ca-certificates git && go mod download
 
 COPY . .
-RUN rm -rf screenies .github
 RUN CGO_ENABLED=0 \
     GOOS=${TARGETOS:-linux} \
     GOARCH=${TARGETARCH:-amd64} \
