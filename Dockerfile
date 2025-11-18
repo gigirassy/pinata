@@ -1,39 +1,35 @@
 # syntax=docker/dockerfile:1.4
-FROM --platform=$BUILDPLATFORM golang:1.24.8-alpine AS builder
+FROM --platform=$BUILDPLATFORM tinygo/tinygo:0.39.0 AS builder
+
 ARG TARGETOS
 ARG TARGETARCH
-ARG TARGETVARIANT
 
 WORKDIR /src
 
-# cache go mod download between builds (requires BuildKit)
+# Copy go modules
 COPY go.mod ./
-RUN apk add --no-cache ca-certificates git
-RUN --mount=type=cache,target=/root/.cache/go-build \
-    --mount=type=cache,target=/go/pkg/mod \
-    go mod download
+# TinyGo uses go modules too
+RUN tinygo mod download
 
 COPY . .
 RUN rm -rf screenies .github
 
-# Static, trimmed, stripped build. Note: removed -gcflags="all=-l"
-RUN CGO_ENABLED=0 \
-    GOOS=${TARGETOS:-linux} \
-    GOARCH=${TARGETARCH:-amd64} \
-    go build -trimpath \
-      -ldflags="-s -w -extldflags '-static' -buildid=''" \
-      -o /pinata ./main.go
+# Build with TinyGo
+RUN tinygo build \
+    -o /pinata \
+    -target linux/${TARGETARCH} \
+    -opt=z \
+    -no-debug \
+    ./main.go
 
 FROM scratch AS runtime
-# copy binary and CA certs only
 COPY --from=builder /pinata /pinata
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
-# unprivileged user (optional)
 USER 65532
-
 EXPOSE 8080
 
+# Memory tuning
 ENV GOMEMLIMIT=8MiB \
     GOGC=20
 
