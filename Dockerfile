@@ -5,7 +5,7 @@ ARG TARGETARCH
 ARG TARGETVARIANT
 
 WORKDIR /src
-COPY go.mod go.sum ./
+COPY go.mod ./
 RUN apk add --no-cache ca-certificates git binutils upx \
     && go mod download
 
