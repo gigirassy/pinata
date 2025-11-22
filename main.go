@@ -309,9 +309,14 @@ a{color:inherit}
 input[type="text"]{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;color:var(--text);min-width:120px;border-radius:8px;outline:none}
 button[type="submit"],.btn-save{background:linear-gradient(90deg,var(--accent),#5b21b6);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
 .btn-save{font-weight:600}
-.img-container { column-width: 260px; column-gap: 16px; width: 100%; max-width: 1400px; margin-top: 18px; }
+
+/* NOTE: column-width now scales with --img-scale so the image/card width grows by percentage */
+.img-container { column-width: calc(260px * var(--img-scale)); column-gap: 16px; width: 100%; max-width: 1400px; margin-top: 18px; }
+
+/* card sizing driven by column width; image fills the card without transform (no zoom) */
 .card { display:inline-block; width:100%; margin:0 0 16px; border-radius:10px; overflow:hidden; background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.02)); box-shadow:0 6px 18px rgba(3,7,18,0.6); border:1px solid rgba(124,58,237,0.06); break-inside: avoid; -webkit-column-break-inside: avoid; -moz-column-break-inside: avoid; min-height:0; position:relative; }
-.card img { display:block; width:100%; height:auto; object-fit:cover; background:#08101a; transform-origin: top center; transform: scale(var(--img-scale)); }
+.card img { display:block; width:100%; height:auto; object-fit:cover; background:#08101a; /* removed transform scale to avoid zooming */ }
+
 .card-controls { position:absolute; top:8px; right:8px; display:flex; gap:8px; align-items:center; }
 .btn-save-mini { background: rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.06); color: var(--text); padding:6px; border-radius:999px; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; text-decoration:none; }
 .magnifier{background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.06);color:var(--text);padding:6px;border-radius:999px;font-size:14px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
@@ -324,13 +329,26 @@ button[type="submit"],.btn-save{background:linear-gradient(90deg,var(--accent),#
 .pagination{text-align:center;margin:26px 0}
 .pagination a{color:var(--accent);text-decoration:none;padding:8px 12px;border-radius:8px;border:1px solid rgba(124,58,237,0.12);background:rgba(124,58,237,0.02)}
 .footer-note{color:var(--muted);font-size:12px;margin-top:22px}
-@media (max-width:640px){ body{padding:12px;font-size:18px} .brand{font-size:22px} input[type="text"]{min-width:120px;padding:12px 14px;font-size:16px} button[type="submit"],.btn-save{padding:10px 14px;font-size:16px;border-radius:10px} .img-container{column-width:180px;column-gap:12px} .search-block{gap:10px;flex-direction:column} .search-inline{width:100%} .search-box{margin-left:0;width:100%} .bookmarks{order:3;width:100%;margin-top:8px} }
+
+/* Mobile: scale base column width by the same variable */
+@media (max-width:640px){
+  body{padding:12px;font-size:18px}
+  .brand{font-size:22px}
+  input[type="text"]{min-width:120px;padding:12px 14px;font-size:16px}
+  button[type="submit"],.btn-save{padding:10px 14px;font-size:16px;border-radius:10px}
+  .img-container{ column-width: calc(180px * var(--img-scale)); column-gap:12px }
+  .search-block{gap:10px;flex-direction:column}
+  .search-inline{width:100%}
+  .search-box{margin-left:0;width:100%}
+  .bookmarks{order:3;width:100%;margin-top:8px}
+}
 `
+
 
 // ---------- handlers ----------
 
 func styleHandler(w http.ResponseWriter, r *http.Request) {
-	w.Header().Set("Content-Type", "text/css; charset=utf-8")
+	w.Header().Set("Content-Type", "text/css; charset=utf8")
 	_, _ = io.WriteString(w, cssContent)
 }
 
@@ -387,7 +405,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	_, _ = io.WriteString(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pinata - Search</title><link rel="stylesheet" href="/static/style.css">`+inlineStyle+`</head><body>`)
 	_, _ = io.WriteString(w, `<div class="header"><a class="brand" href="/">Pinata</a><div class="search-box"></div></div>`)
-	_, _ = io.WriteString(w, `<div style="color:var(--muted); margin-bottom:12px;">Search images from Pinterest — submit a search to view results.</div>`)
+	_, _ = io.WriteString(w, `<div style="color:var(--muted); margin-bottom:12px;">Pinata is an alternate frontend to Pinterest with support for reverse image search, encrypted bookmarks, and image proxying! None of your data ever reaches Pinterest or their servers while using this frontend, and the instance owner can not ever see what you view or bookmarks.</div>`)
 	_, _ = io.WriteString(w, `<form class="search-block" method="get" action="/search"><input type="text" name="q" placeholder="Search Image" required maxlength="64"><button type="submit">Search</button></form>`)
 
 	// Settings form (color + scale)
@@ -425,7 +443,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `</div>`)
 	}
 
-	_, _ = io.WriteString(w, `<div class="footer-note">Powered by Pinata • Reverse image search uses Tineye</div></body></html>`)
+	_, _ = io.WriteString(w, `<div class="footer-note">Powered by Pinata • Reverse image search uses Tineye • <a href="https://codeberg.org/gigirassy/pinata/">Contribute to this code or host your own instance!</a></div></body></html>`)
 }
 
 // searchHandler: streaming results, include inline style variables from cookies
@@ -590,7 +608,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		next := "/search?q=" + qenc + "&bookmark=" + benc + cenc
 		_, _ = io.WriteString(w, `<div class="pagination"><a href="`+html.EscapeString(next)+`">Next page</a></div>`)
 	}
-	_, _ = io.WriteString(w, `<div class="footer-note">Powered by Pinata • Reverse image search uses Tineye</div></body></html>`)
+	_, _ = io.WriteString(w, `<div class="footer-note">Powered by Pinata • Reverse image search uses Tineye • <a href="https://codeberg.org/gigirassy/pinata/">Contribute to this code or host your own instance!</a></div></body></html>`)
 }
 
 // ---------- secure image proxy (only https i.pinimg.com) ----------
