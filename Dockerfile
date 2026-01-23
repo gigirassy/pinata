@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1.4
+# beep
 FROM --platform=$BUILDPLATFORM kgrv/golang AS builder
 USER mini
 ARG TARGETOS
