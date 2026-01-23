@@ -1,12 +1,13 @@
 # syntax=docker/dockerfile:1.4
-FROM --platform=$BUILDPLATFORM golang:1.24.8-alpine AS builder
+FROM --platform=$BUILDPLATFORM kgrv/golang AS builder
+USER mini
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
 WORKDIR /src
 COPY go.mod ./
-RUN apk add --no-cache ca-certificates git && go mod download
+RUN doas apk add --no-cache ca-certificates git && go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 \
