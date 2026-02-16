@@ -1,5 +1,9 @@
 name: Build and Push Multi-Arch Container
 
+env:
+  REGISTRY_HOST: codeberg.org
+  REGISTRY_REPO: gigirassy/pinata
+
 on:
   push:
     branches:
