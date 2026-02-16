@@ -10,7 +10,10 @@ on:
 jobs:
   build:
     runs-on: nune-runner
-
+    
+    container: 
+      image: docker:24-dind
+    
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
