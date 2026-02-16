@@ -5,9 +5,7 @@ env:
   REGISTRY_REPO: gigirassy/pinata
 
 on:
-  push:
-    branches:
-      - main
+  workflow-dispatch:
 
 jobs:
   build:
