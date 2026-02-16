@@ -1,6 +1,6 @@
 services:
   pinata:
-    image: ghcr.io/gigirassy/pinata:main # this repo is on codeberg, but github workflows is used for the image >:p
+    image: codeberg.org/gigirassy/pinata:latest
     # build: .
     ports:
       - "127.0.0.1:8080:8080"
