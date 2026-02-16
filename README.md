@@ -11,7 +11,7 @@ Pinata takes very little memory to run, about 7MB of memory with an Alpine docke
 Despite being so light, Pinata supports bookmarks (encrypted!) and can be made a PWA on your phone.
 
 
-**Contribute to <a href="https://codeberg.org/gigirassy/pinata/">this repo on Codeberg</a>! While the image is hosted on a Github mirror, the code itself is edited on Codeberg!!**
+**Contribute to <a href="https://codeberg.org/gigirassy/pinata/">this repo on Codeberg</a>!**
 
 ## How to run
 
