@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: nune-runner
+    runs-on: host
     
     steps:
       - name: Checkout repository
