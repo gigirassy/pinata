@@ -1,14 +1,13 @@
 # syntax=docker/dockerfile:1.4
 # beep
-FROM --platform=$BUILDPLATFORM kgrv/golang AS builder
-USER root
+FROM --platform=$BUILDPLATFORM chimeralinux/chimera:latest AS builder
 ARG TARGETOS
 ARG TARGETARCH
 ARG TARGETVARIANT
 
 WORKDIR /src
 COPY go.mod ./
-RUN apk add --no-cache ca-certificates git && go mod download
+RUN apk add --no-cache ca-certificates git go && go mod download
 
 COPY . .
 RUN CGO_ENABLED=0 \
