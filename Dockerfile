@@ -18,7 +18,7 @@ RUN CGO_ENABLED=0 \
       -gcflags="all=-l" \
       -o /pinata ./main.go
 
-FROM scratch AS runtime
+FROM chimeralinux/chimera:latest AS runtime
 COPY --from=builder /pinata /pinata
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 USER 65532
