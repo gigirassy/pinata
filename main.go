@@ -1,4 +1,3 @@
-// main.go
 package main
 
 import (
@@ -16,6 +15,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -56,6 +56,9 @@ type BookmarkEntry struct {
 var bookmarkKey []byte
 var bookmarkingEnabled bool
 var disableReverse bool
+var chunkedMode bool
+var chunkSize = 8
+var chunkWorkers = 4
 
 const maxBookmarks = 30
 const maxItemLen = 256
@@ -84,6 +87,40 @@ func init() {
 		log.Println("Reverse image search disabled via PINATA_DISABLE_REVERSE")
 	default:
 		disableReverse = false
+	}
+
+	// CHUNK enables chunked/threaded rendering of result cards.
+	// Examples:
+	//   CHUNK=0/false/no/off -> disabled
+	//   CHUNK=1/true/yes/on  -> enabled with default chunk size
+	//   CHUNK=12             -> enabled with 12-item batches
+	if raw := strings.TrimSpace(os.Getenv("CHUNK")); raw != "" {
+		switch strings.ToLower(raw) {
+		case "0", "false", "no", "off":
+			chunkedMode = false
+		default:
+			chunkedMode = true
+			if n, err := strconv.Atoi(raw); err == nil && n > 0 {
+				chunkSize = n
+			}
+		}
+	}
+	if chunkSize < 4 {
+		chunkSize = 4
+	}
+	if chunkSize > 16 {
+		chunkSize = 16
+	}
+	cpus := runtime.GOMAXPROCS(0)
+	if cpus < 1 {
+		cpus = 1
+	}
+	if cpus > 4 {
+		cpus = 4
+	}
+	chunkWorkers = cpus
+	if chunkedMode {
+		log.Printf("Chunked mode enabled: chunkSize=%d workers=%d", chunkSize, chunkWorkers)
 	}
 }
 
@@ -344,7 +381,6 @@ button[type="submit"],.btn-save{background:linear-gradient(90deg,var(--accent),#
 }
 `
 
-
 // ---------- handlers ----------
 
 func styleHandler(w http.ResponseWriter, r *http.Request) {
@@ -393,6 +429,99 @@ func settingsPostHandler(w http.ResponseWriter, r *http.Request) {
 		next = "/"
 	}
 	http.Redirect(w, r, next, http.StatusSeeOther)
+}
+
+func renderCardHTML(q, next, u string) string {
+	esc := url.QueryEscape(u)
+	b64 := base64.StdEncoding.EncodeToString([]byte(u))
+
+	var b strings.Builder
+	b.Grow(len(u)*2 + 512)
+	b.WriteString(`<div class="card">`)
+	b.WriteString(`<a href="/image_proxy?url=`)
+	b.WriteString(esc)
+	b.WriteString(`" style="display:block;"><img loading="lazy" src="/image_proxy?url=`)
+	b.WriteString(esc)
+	b.WriteString(`" alt="image"></a>`)
+	b.WriteString(`<div class="card-controls">`)
+	if !disableReverse {
+		b.WriteString(`<a class="magnifier" href="/revsearch?b64=`)
+		b.WriteString(b64)
+		b.WriteString(`" title="Search Tineye" target="_blank">🔍</a>`)
+	}
+	if bookmarkingEnabled {
+		b.WriteString(`<form method="post" action="/bookmark_image" style="display:inline;margin:0;">`)
+		b.WriteString(`<input type="hidden" name="url" value="`)
+		b.WriteString(html.EscapeString(u))
+		b.WriteString(`"><input type="hidden" name="next" value="`)
+		b.WriteString(html.EscapeString(next))
+		b.WriteString(`"><button class="btn-save-mini" type="submit" title="Save image">❤</button></form>`)
+	}
+	b.WriteString(`</div></div>`)
+	return b.String()
+}
+
+func writeChunkedCards(w http.ResponseWriter, q, next string, urls []string) {
+	if len(urls) == 0 {
+		return
+	}
+	if !chunkedMode || len(urls) == 1 {
+		for _, u := range urls {
+			_, _ = io.WriteString(w, renderCardHTML(q, next, u))
+		}
+		if f, ok := w.(http.Flusher); ok {
+			f.Flush()
+		}
+		return
+	}
+
+	type job struct {
+		idx int
+		u   string
+	}
+	type result struct {
+		idx  int
+		html string
+	}
+
+	jobs := make(chan job, len(urls))
+	results := make(chan result, len(urls))
+
+	workers := chunkWorkers
+	if workers > len(urls) {
+		workers = len(urls)
+	}
+	var wg sync.WaitGroup
+	wg.Add(workers)
+	for i := 0; i < workers; i++ {
+		go func() {
+			defer wg.Done()
+			for j := range jobs {
+				results <- result{idx: j.idx, html: renderCardHTML(q, next, j.u)}
+			}
+		}()
+	}
+
+	for i, u := range urls {
+		jobs <- job{idx: i, u: u}
+	}
+	close(jobs)
+
+	go func() {
+		wg.Wait()
+		close(results)
+	}()
+
+	out := make([]string, len(urls))
+	for r := range results {
+		out[r.idx] = r.html
+	}
+	for _, s := range out {
+		_, _ = io.WriteString(w, s)
+	}
+	if f, ok := w.(http.Flusher); ok {
+		f.Flush()
+	}
 }
 
 // Index (front) - server-rendered bookmarks and settings form (no JS)
@@ -521,6 +650,8 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 
 	dec := json.NewDecoder(resp.Body)
 	var nextBookmark string
+	nextSearch := "/search?q=" + url.QueryEscape(q)
+	chunk := make([]string, 0, chunkSize)
 
 	for {
 		tk, err := dec.Token()
@@ -561,25 +692,17 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 				if u == "" {
 					continue
 				}
-				esc := url.QueryEscape(u)
-				b64 := base64.StdEncoding.EncodeToString([]byte(u))
-
-				// card
-				_, _ = io.WriteString(w, `<div class="card">`)
-				_, _ = io.WriteString(w, `<a href="/image_proxy?url=`+esc+`" style="display:block;"><img loading="lazy" src="/image_proxy?url=`+esc+`" alt="image"></a>`)
-				_, _ = io.WriteString(w, `<div class="card-controls">`)
-				if !disableReverse {
-					_, _ = io.WriteString(w, `<a class="magnifier" href="/revsearch?b64=`+b64+`" title="Search Tineye" target="_blank">🔍</a>`)
-				}
-				if bookmarkingEnabled {
-					next := "/search?q=" + url.QueryEscape(q)
-					_, _ = io.WriteString(w, `<form method="post" action="/bookmark_image" style="display:inline;margin:0;"><input type="hidden" name="url" value="`+html.EscapeString(u)+`"><input type="hidden" name="next" value="`+html.EscapeString(next)+`"><button class="btn-save-mini" type="submit" title="Save image">❤</button></form>`)
-				}
-				_, _ = io.WriteString(w, `</div>`) // card-controls
-				_, _ = io.WriteString(w, `</div>`) // card
-
-				if f, ok := w.(http.Flusher); ok {
-					f.Flush()
+				if chunkedMode {
+					chunk = append(chunk, u)
+					if len(chunk) >= chunkSize {
+						writeChunkedCards(w, q, nextSearch, chunk)
+						chunk = chunk[:0]
+					}
+				} else {
+					_, _ = io.WriteString(w, renderCardHTML(q, nextSearch, u))
+					if f, ok := w.(http.Flusher); ok {
+						f.Flush()
+					}
 				}
 			}
 			_, _ = dec.Token()
@@ -593,6 +716,10 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 		default:
 			continue
 		}
+	}
+
+	if chunkedMode && len(chunk) > 0 {
+		writeChunkedCards(w, q, nextSearch, chunk)
 	}
 
 	_, _ = io.WriteString(w, `</div>`)
@@ -688,7 +815,7 @@ func revsearchHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, tineye, http.StatusSeeOther)
 }
 
-// ---------- bookmark handlers (unchanged from previous) ----------
+// ---------- bookmark handlers ----------
 
 func bookmarkPostHandler(w http.ResponseWriter, r *http.Request) {
 	if !bookmarkingEnabled {
