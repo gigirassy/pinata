@@ -9,5 +9,7 @@ services:
       - PINATA_BOOKMARK_KEY=
       # The reverse image search uses Tineye, which often requires Cloudflare! If you aren't comfortable with it, set this variable to 0.
       - PINATA_DISABLE_REVERSE=1
+      # Chunk mode! This is a feature that allows you to process Pinterest images faster at the cost of using slightly more memory. Set to 0 to disable.
+      - CHUNK=10
     restart: unless-stopped
 
