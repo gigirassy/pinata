@@ -6,10 +6,9 @@ Self-explanatory. It's built with the idea of being light as possible, and shame
 
 The Docker image, built by you, ranges between 5-7 MB, and the entire workings depend on a single main.go.
 
-Pinata takes very little memory to run, about 7MB of memory with an Alpine docker image when active, and 1MB when idle.
+Pinata takes very little memory to run, about 7MB of memory with an Chimera docker image when active, and 1MB when idle. In addition, the frontend uses no Javascript, which makes it friendly to low-end systems like netbooks!
 
-Despite being so light, Pinata supports bookmarks (encrypted!) and can be made a PWA on your phone.
-
+Despite being so light, Pinata supports bookmarks via cookies (encrypted!) and can be made a PWA on your phone.
 
 **Contribute to <a href="https://codeberg.org/gigirassy/pinata/">this repo on Codeberg</a>!**
 
