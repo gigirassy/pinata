@@ -10,7 +10,7 @@ on:
 
 jobs:
   build:
-    runs-on: self-hosted
+    runs-on: codeberg-small
     
     steps:
       - name: Checkout repository
