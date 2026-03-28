@@ -29,8 +29,6 @@ RUN printf '%s\n' \
 '#!/bin/sh' \
 'set -eu' \
 '' \
-'cp /etc/resolv.conf /run/dnsmasq.resolv || true' \
-'' \
 'dnsmasq --no-daemon \' \
 '  --port=5353 \' \
 '  --listen-address=127.0.0.1 \' \
