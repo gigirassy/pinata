@@ -1,8 +1,8 @@
 # syntax=docker/dockerfile:1.4
+
 FROM --platform=$BUILDPLATFORM chimeralinux/chimera:latest AS builder
 ARG TARGETOS
 ARG TARGETARCH
-ARG TARGETVARIANT
 
 WORKDIR /src
 COPY go.mod ./
@@ -20,27 +20,27 @@ RUN CGO_ENABLED=0 \
 
 FROM chimeralinux/chimera:latest AS runtime
 
-RUN apk add --no-cache ca-certificates dnsmasq util-linux
+RUN apk add --no-cache ca-certificates dnsmasq
 
 COPY --from=builder /pinata /pinata
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
 RUN mkdir -p /run
 
+# Non-root by default
+USER 65532
+
 RUN cat > /entrypoint.sh <<'EOF'
 #!/bin/sh
 set -eu
 
 UPSTREAM="/run/dnsmasq.resolv"
-
 cp /etc/resolv.conf "$UPSTREAM" || true
-
-printf "nameserver 127.0.0.1\noptions timeout:1 attempts:1\n" > /etc/resolv.conf
 
 dnsmasq \
   --no-daemon \
+  --port=5353 \
   --listen-address=127.0.0.1 \
-  --bind-interfaces \
   --cache-size=10000 \
   --neg-ttl=60 \
   --resolv-file="$UPSTREAM" \
@@ -49,10 +49,12 @@ dnsmasq \
 DNSMASQ_PID=$!
 trap 'kill $DNSMASQ_PID 2>/dev/null || true' EXIT INT TERM
 
-sleep 0.5
+sleep 0.3
 
-# Drop privileges (Chimera-compatible)
-exec setpriv --reuid=65532 --regid=65532 --clear-groups /pinata
+export GODEBUG=netdns=go
+export DNSCACHE="127.0.0.1:5353"
+
+exec /pinata
 EOF
 
 RUN chmod +x /entrypoint.sh
