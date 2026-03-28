@@ -18,50 +18,38 @@ RUN CGO_ENABLED=0 \
       -o /pinata ./main.go
 
 
-FROM chimeralinux/chimera:latest AS runtime
+FROM chimeralinux/chimera:latest
 
 RUN apk add --no-cache ca-certificates dnsmasq
 
 COPY --from=builder /pinata /pinata
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
-RUN mkdir -p /run
+RUN printf '%s\n' \
+'#!/bin/sh' \
+'set -eu' \
+'' \
+'cp /etc/resolv.conf /run/dnsmasq.resolv || true' \
+'' \
+'dnsmasq --no-daemon \' \
+'  --port=5353 \' \
+'  --listen-address=127.0.0.1 \' \
+'  --cache-size=10000 \' \
+'  --neg-ttl=60 \' \
+'  --resolv-file=/run/dnsmasq.resolv \' \
+'  --log-facility=- &' \
+'' \
+'sleep 0.2' \
+'' \
+'exec /pinata' \
+> /entrypoint.sh && chmod +x /entrypoint.sh
 
-# Non-root by default
 USER 65532
-
-RUN cat > /entrypoint.sh <<'EOF'
-#!/bin/sh
-set -eu
-
-UPSTREAM="/run/dnsmasq.resolv"
-cp /etc/resolv.conf "$UPSTREAM" || true
-
-dnsmasq \
-  --no-daemon \
-  --port=5353 \
-  --listen-address=127.0.0.1 \
-  --cache-size=10000 \
-  --neg-ttl=60 \
-  --resolv-file="$UPSTREAM" \
-  --log-facility=- &
-
-DNSMASQ_PID=$!
-trap 'kill $DNSMASQ_PID 2>/dev/null || true' EXIT INT TERM
-
-sleep 0.3
-
-export GODEBUG=netdns=go
-export DNSCACHE="127.0.0.1:5353"
-
-exec /pinata
-EOF
-
-RUN chmod +x /entrypoint.sh
 
 EXPOSE 8080
 
 ENV GOMEMLIMIT=8MiB \
-    GOGC=20
+    GOGC=20 \
+    GODEBUG=netdns=go
 
 ENTRYPOINT ["/entrypoint.sh"]
