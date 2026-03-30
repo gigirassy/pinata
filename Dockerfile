@@ -4,7 +4,7 @@ ARG TARGETARCH
 
 WORKDIR /src
 COPY go.mod ./
-RUN apk add --no-cache ca-certificates git go && go install git.maid.zone/stuff/soundcloakctl@latest && go mod download && go mod download git.maid.zone/stuff/soundcloakctl
+RUN apk add --no-cache ca-certificates git go && go install git.maid.zone/stuff/soundcloakctl@latest && go mod download && go mod download git.maid.zone/stuff/soundcloakctl && go mod tidy
 RUN go env -w GOPROXY=direct
 
 
