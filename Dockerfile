@@ -4,13 +4,13 @@ ARG TARGETARCH
 
 WORKDIR /src
 COPY go.mod ./
-RUN apk add --no-cache ca-certificates git go && go install git.maid.zone/stuff/soundcloakctl@latest && go mod download && go mod download git.maid.zone/stuff/soundcloakctl && go mod tidy
+RUN apk add --no-cache ca-certificates git go && go install git.maid.zone/stuff/soundcloakctl@latest && go mod download && go mod download git.maid.zone/stuff/soundcloakctl
 RUN go env -w GOPROXY=direct
 
 
 COPY . .
 
-RUN go tool soundcloakctl -nozstd -notable precompress
+RUN go mod tidy && go tool soundcloakctl -nozstd -notable precompress
 RUN CGO_ENABLED=0 \
     GOOS=${TARGETOS:-linux} \
     GOARCH=${TARGETARCH:-amd64} \
