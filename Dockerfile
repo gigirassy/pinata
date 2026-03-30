@@ -4,7 +4,8 @@ ARG TARGETARCH
 
 WORKDIR /src
 COPY go.mod ./
-RUN apk add --no-cache ca-certificates git go && go mod download
+RUN go env -w GOPROXY=direct
+RUN apk add --no-cache ca-certificates git go && go mod download all
 
 COPY . .
 
