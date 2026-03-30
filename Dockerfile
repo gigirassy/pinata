@@ -7,6 +7,8 @@ COPY go.mod ./
 RUN apk add --no-cache ca-certificates git go && go mod download
 
 COPY . .
+
+RUN go tool soundcloakctl -nozstd -notable precompress
 RUN CGO_ENABLED=0 \
     GOOS=${TARGETOS:-linux} \
     GOARCH=${TARGETARCH:-amd64} \
