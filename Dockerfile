@@ -1,10 +1,10 @@
-FROM --platform=$BUILDPLATFORM chimeralinux/chimera:latest AS builder
+FROM --platform=$BUILDPLATFORM kgrv/golang AS builder
 ARG TARGETOS
 ARG TARGETARCH
 
 WORKDIR /src
 COPY go.mod ./
-RUN apk add --no-cache ca-certificates git go && go mod download
+RUN apk add --no-cache ca-certificates git && go mod download
 RUN go env -w GOPROXY=direct
 
 
@@ -18,17 +18,14 @@ RUN CGO_ENABLED=0 \
       -o /pinata ./main.go
 
 
-FROM kgrv/mini:tini AS runtime
+FROM scratch AS runtime
 
 COPY --from=builder /pinata /pinata
 COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certificates.crt
 
-ENV GOMEMLIMIT=8MiB \
-    GOGC=20 \
-    GODEBUG=netdns=go
-
-USER mini
+ENV GOMEMLIMIT=15MiB \
+    GOGC=20
 
 EXPOSE 8080
 
-ENTRYPOINT ["tini", "--", "/pinata"]
+ENTRYPOINT ["/pinata"]
