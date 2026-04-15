@@ -8,6 +8,7 @@ env:
 on:
   push:
 
+
 jobs:
   build:
     runs-on: self-hosted
@@ -16,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up QEMU (for cross-platform building)
+      - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Buildx
@@ -29,7 +30,25 @@ jobs:
           username: ${{ secrets.REGISTRY_USER }}
           password: ${{ secrets.REGISTRY_PASS }}
 
-      - name: Build and push images
+      - name: Build image (export tar)
+        run: |
+          docker buildx build \
+            --platform linux/amd64 \
+            --output type=docker,dest=image.tar \
+            -t local-image:scan \
+            .
+
+      - name: Scan image with Grype
+        run: |
+          docker run --rm \
+            -v $(pwd):/work \
+            anchore/grype:latest \
+            docker-archive:/work/image.tar \
+            --fail-on high \
+            -o table
+
+      - name: Build and push multi-arch image
+        if: success()
         uses: docker/build-push-action@v6
         with:
           context: .
