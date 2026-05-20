@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/aes"
 	"crypto/cipher"
@@ -9,8 +10,14 @@ import (
 	"encoding/json"
 	"fmt"
 	"html"
+	"image"
+	_ "image/gif"
+	_ "image/jpeg"
+	_ "image/png"
+	"image/jpeg"
 	"io"
 	"log"
+	"math"
 	"net"
 	"net/http"
 	"net/url"
@@ -431,22 +438,31 @@ func settingsPostHandler(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
-func renderCardHTML(q, next, u string) string {
-	esc := url.QueryEscape(u)
-	b64 := base64.StdEncoding.EncodeToString([]byte(u))
+func renderCardHTML(q, next, u string, thumbMobile, thumbDesktop, thumbHigh int) string {
+	full := "/image_proxy?url=" + url.QueryEscape(u)
+	tm := thumbURL(u, thumbMobile)
+	td := thumbURL(u, thumbDesktop)
+	th := thumbURL(u, thumbHigh)
+
+	srcset := fmt.Sprintf("%s %dw, %s %dw, %s %dw", tm, thumbMobile, td, thumbDesktop, th, thumbHigh)
+	sizes := fmt.Sprintf("(max-width:640px) %dpx, %dpx", thumbMobile, thumbDesktop)
 
 	var b strings.Builder
-	b.Grow(len(u)*2 + 512)
+	b.Grow(len(u)*2 + 768)
 	b.WriteString(`<div class="card">`)
-	b.WriteString(`<a href="/image_proxy?url=`)
-	b.WriteString(esc)
-	b.WriteString(`" style="display:block;"><img loading="lazy" src="/image_proxy?url=`)
-	b.WriteString(esc)
+	b.WriteString(`<a href="`)
+	b.WriteString(html.EscapeString(full))
+	b.WriteString(`" style="display:block;" target="_blank" rel="noreferrer"><img loading="lazy" decoding="async" src="`)
+	b.WriteString(html.EscapeString(td))
+	b.WriteString(`" srcset="`)
+	b.WriteString(html.EscapeString(srcset))
+	b.WriteString(`" sizes="`)
+	b.WriteString(html.EscapeString(sizes))
 	b.WriteString(`" alt="image"></a>`)
 	b.WriteString(`<div class="card-controls">`)
 	if !disableReverse {
 		b.WriteString(`<a class="magnifier" href="/revsearch?b64=`)
-		b.WriteString(b64)
+		b.WriteString(base64.StdEncoding.EncodeToString([]byte(u)))
 		b.WriteString(`" title="Search Tineye" target="_blank">🔍</a>`)
 	}
 	if bookmarkingEnabled {
@@ -461,13 +477,13 @@ func renderCardHTML(q, next, u string) string {
 	return b.String()
 }
 
-func writeChunkedCards(w http.ResponseWriter, q, next string, urls []string) {
+func writeChunkedCards(w http.ResponseWriter, q, next string, urls []string, thumbMobile, thumbDesktop, thumbHigh int) {
 	if len(urls) == 0 {
 		return
 	}
 	if !chunkedMode || len(urls) == 1 {
 		for _, u := range urls {
-			_, _ = io.WriteString(w, renderCardHTML(q, next, u))
+			_, _ = io.WriteString(w, renderCardHTML(q, next, u, thumbMobile, thumbDesktop, thumbHigh))
 		}
 		if f, ok := w.(http.Flusher); ok {
 			f.Flush()
@@ -497,7 +513,7 @@ func writeChunkedCards(w http.ResponseWriter, q, next string, urls []string) {
 		go func() {
 			defer wg.Done()
 			for j := range jobs {
-				results <- result{idx: j.idx, html: renderCardHTML(q, next, j.u)}
+				results <- result{idx: j.idx, html: renderCardHTML(q, next, j.u, thumbMobile, thumbDesktop, thumbHigh)}
 			}
 		}()
 	}
@@ -631,6 +647,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	accent, imgScale := getThemeVars(r)
+	thumbMobile, thumbDesktop, thumbHigh := thumbWidths(imgScale)
 	accentRgba := hexToRGBA(accent, 0.12)
 	inlineStyle := fmt.Sprintf(`<style>:root{--accent:%s;--accent-rgba:%s;--img-scale:%s;}</style>`, html.EscapeString(accent), html.EscapeString(accentRgba), html.EscapeString(imgScale))
 
@@ -695,11 +712,11 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 				if chunkedMode {
 					chunk = append(chunk, u)
 					if len(chunk) >= chunkSize {
-						writeChunkedCards(w, q, nextSearch, chunk)
+						writeChunkedCards(w, q, nextSearch, chunk, thumbMobile, thumbDesktop, thumbHigh)
 						chunk = chunk[:0]
 					}
 				} else {
-					_, _ = io.WriteString(w, renderCardHTML(q, nextSearch, u))
+					_, _ = io.WriteString(w, renderCardHTML(q, nextSearch, u, thumbMobile, thumbDesktop, thumbHigh))
 					if f, ok := w.(http.Flusher); ok {
 						f.Flush()
 					}
@@ -719,7 +736,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if chunkedMode && len(chunk) > 0 {
-		writeChunkedCards(w, q, nextSearch, chunk)
+		writeChunkedCards(w, q, nextSearch, chunk, thumbMobile, thumbDesktop, thumbHigh)
 	}
 
 	_, _ = io.WriteString(w, `</div>`)
@@ -789,6 +806,160 @@ func imageProxyHandler(w http.ResponseWriter, r *http.Request) {
 	buf := *bufPtr
 	_, _ = io.CopyBuffer(w, resp.Body, buf)
 	copyBufPool.Put(bufPtr)
+}
+
+func thumbWidths(scaleStr string) (int, int, int) {
+	scale := 1.0
+	if v, err := strconv.ParseFloat(scaleStr, 64); err == nil && v > 0 {
+		scale = v
+	}
+	mobile := int(math.Round(180 * scale))
+	desktop := int(math.Round(260 * scale))
+	high := int(math.Round(520 * scale))
+	if mobile < 120 {
+		mobile = 120
+	}
+	if desktop < mobile {
+		desktop = mobile
+	}
+	if high < desktop {
+		high = desktop
+	}
+	return mobile, desktop, high
+}
+
+func thumbURL(u string, w int) string {
+	return "/thumb_proxy?url=" + url.QueryEscape(u) + "&w=" + strconv.Itoa(w)
+}
+
+func resizeNearest(src image.Image, dstW int) image.Image {
+	b := src.Bounds()
+	sw := b.Dx()
+	sh := b.Dy()
+	if dstW <= 0 || sw <= 0 || sh <= 0 || dstW >= sw {
+		return src
+	}
+	dstH := int(math.Round(float64(sh) * float64(dstW) / float64(sw)))
+	if dstH < 1 {
+		dstH = 1
+	}
+	dst := image.NewRGBA(image.Rect(0, 0, dstW, dstH))
+	for y := 0; y < dstH; y++ {
+		sy := b.Min.Y + int(float64(y)*float64(sh)/float64(dstH))
+		if sy >= b.Max.Y {
+			sy = b.Max.Y - 1
+		}
+		for x := 0; x < dstW; x++ {
+			sx := b.Min.X + int(float64(x)*float64(sw)/float64(dstW))
+			if sx >= b.Max.X {
+				sx = b.Max.X - 1
+			}
+			dst.Set(x, y, src.At(sx, sy))
+		}
+	}
+	return dst
+}
+
+func thumbImageProxyHandler(w http.ResponseWriter, r *http.Request) {
+	uq := r.URL.Query().Get("url")
+	if uq == "" {
+		http.Error(w, "url required", http.StatusBadRequest)
+		return
+	}
+	orig, err := url.QueryUnescape(uq)
+	if err != nil {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	parsed, err := url.Parse(orig)
+	if err != nil {
+		http.Error(w, "invalid url", http.StatusBadRequest)
+		return
+	}
+	if parsed.Scheme != "https" {
+		http.Error(w, "proxy allowed for https only", http.StatusForbidden)
+		return
+	}
+	if !strings.EqualFold(parsed.Hostname(), "i.pinimg.com") {
+		http.Error(w, "proxy allowed only for i.pinimg.com", http.StatusForbidden)
+		return
+	}
+
+	targetW, err := strconv.Atoi(strings.TrimSpace(r.URL.Query().Get("w")))
+	if err != nil || targetW < 1 {
+		targetW = 260
+	}
+
+	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
+	defer cancel()
+
+	req, err := http.NewRequestWithContext(ctx, "GET", parsed.String(), nil)
+	if err != nil {
+		http.Error(w, "failed", http.StatusBadGateway)
+		return
+	}
+	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		http.Error(w, "failed to fetch", http.StatusBadGateway)
+		return
+	}
+	defer resp.Body.Close()
+
+	data, err := io.ReadAll(resp.Body)
+	if err != nil {
+		http.Error(w, "failed to read", http.StatusBadGateway)
+		return
+	}
+
+	if resp.StatusCode != http.StatusOK {
+		if ct := resp.Header.Get("Content-Type"); ct != "" {
+			w.Header().Set("Content-Type", ct)
+		}
+		if cc := resp.Header.Get("Cache-Control"); cc != "" {
+			w.Header().Set("Cache-Control", cc)
+		}
+		w.WriteHeader(resp.StatusCode)
+		_, _ = w.Write(data)
+		return
+	}
+
+	img, _, err := image.Decode(bytes.NewReader(data))
+	if err != nil {
+		if ct := resp.Header.Get("Content-Type"); ct != "" {
+			w.Header().Set("Content-Type", ct)
+		} else {
+			w.Header().Set("Content-Type", http.DetectContentType(data))
+		}
+		if cc := resp.Header.Get("Cache-Control"); cc != "" {
+			w.Header().Set("Cache-Control", cc)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(data)
+		return
+	}
+
+	if targetW >= img.Bounds().Dx() {
+		if ct := resp.Header.Get("Content-Type"); ct != "" {
+			w.Header().Set("Content-Type", ct)
+		} else {
+			w.Header().Set("Content-Type", http.DetectContentType(data))
+		}
+		if cc := resp.Header.Get("Cache-Control"); cc != "" {
+			w.Header().Set("Cache-Control", cc)
+		}
+		w.WriteHeader(http.StatusOK)
+		_, _ = w.Write(data)
+		return
+	}
+
+	w.Header().Set("Content-Type", "image/jpeg")
+	if cc := resp.Header.Get("Cache-Control"); cc != "" {
+		w.Header().Set("Cache-Control", cc)
+	}
+	w.WriteHeader(http.StatusOK)
+	_ = jpeg.Encode(w, resizeNearest(img, targetW), &jpeg.Options{Quality: 82})
 }
 
 func revsearchHandler(w http.ResponseWriter, r *http.Request) {
@@ -1017,6 +1188,7 @@ func main() {
 	mux.HandleFunc("/search", searchHandler)
 	mux.HandleFunc("/image_proxy", imageProxyHandler)
 	mux.HandleFunc("/revsearch", revsearchHandler)
+	mux.HandleFunc("/thumb_proxy", thumbImageProxyHandler)
 
 	// bookmark endpoints
 	mux.HandleFunc("/bookmark", bookmarkPostHandler)
