@@ -29,14 +29,16 @@ import (
 	"time"
 )
 
-// ---------- tuned HTTP client and buffer pool ----------
 var httpClient = &http.Client{
 	Timeout: 15 * time.Second,
 	Transport: &http.Transport{
+		Proxy: http.ProxyFromEnvironment,
+
 		DialContext: (&net.Dialer{
 			Timeout:   8 * time.Second,
 			KeepAlive: 30 * time.Second,
 		}).DialContext,
+
 		MaxIdleConns:        6,
 		MaxIdleConnsPerHost: 3,
 		IdleConnTimeout:     60 * time.Second,
@@ -547,7 +549,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 	accentRgba := hexToRGBA(accent, 0.12)
 	inlineStyle := fmt.Sprintf(`<style>:root{--accent:%s;--accent-rgba:%s;--img-scale:%s;}</style>`, html.EscapeString(accent), html.EscapeString(accentRgba), html.EscapeString(imgScale))
 
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf8")
 	_, _ = io.WriteString(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Pinata - Search</title><link rel="stylesheet" href="/static/style.css">`+inlineStyle+`</head><body>`)
 	_, _ = io.WriteString(w, `<div class="header"><a class="brand" href="/">Pinata</a><div class="search-box"></div></div>`)
 	_, _ = io.WriteString(w, `<div style="color:var(--muted); margin-bottom:12px;">Pinata is an alternate frontend to Pinterest with support for reverse image search, encrypted bookmarks, and image proxying! None of your data ever reaches Pinterest or their servers while using this frontend, and the instance owner can not ever see what you view or bookmarks.</div>`)
