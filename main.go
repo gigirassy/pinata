@@ -66,6 +66,7 @@ var bookmarkKey []byte
 var bookmarkingEnabled bool
 var disableReverse bool
 var chunkedMode bool
+var imageBackendBase string
 var chunkSize = 8
 var chunkWorkers = 4
 
@@ -131,6 +132,7 @@ func init() {
 	if chunkedMode {
 		log.Printf("Chunked mode enabled: chunkSize=%d workers=%d", chunkSize, chunkWorkers)
 	}
+	imageBackendBase = strings.TrimRight(strings.TrimSpace(os.Getenv("PINATA_IMAGE_BACKEND")), "/")
 }
 
 // ---------- encryption helpers (AES-GCM) ----------
@@ -542,6 +544,11 @@ func writeChunkedCards(w http.ResponseWriter, q, next string, urls []string, thu
 	}
 }
 
+
+func useImageBackend() bool {
+	return imageBackendBase != ""
+}
+
 // Index (front) - server-rendered bookmarks and settings form (no JS)
 func indexHandler(w http.ResponseWriter, r *http.Request) {
 	accent, imgScale := getThemeVars(r)
@@ -654,7 +661,7 @@ func searchHandler(w http.ResponseWriter, r *http.Request) {
 	inlineStyle := fmt.Sprintf(`<style>:root{--accent:%s;--accent-rgba:%s;--img-scale:%s;}</style>`, html.EscapeString(accent), html.EscapeString(accentRgba), html.EscapeString(imgScale))
 
 	// Start streaming HTML
-	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Content-Type", "text/html; charset=utf8")
 	_, _ = io.WriteString(w, `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>`+html.EscapeString(q)+` - Pinata</title><link rel="stylesheet" href="/static/style.css">`+inlineStyle+`</head><body>`)
 	// header: inline search and Save-search form
 	_, _ = io.WriteString(w, `<div class="header" style="margin-bottom:8px;"><a class="brand" href="/">Pinata</a><div class="search-box">`)
@@ -764,17 +771,19 @@ func imageProxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "url required", http.StatusBadRequest)
 		return
 	}
+
 	orig, err := url.QueryUnescape(uq)
 	if err != nil {
 		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
 	}
+
 	parsed, err := url.Parse(orig)
 	if err != nil {
 		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
 	}
-	// require https and exact host
+
 	if parsed.Scheme != "https" {
 		http.Error(w, "proxy allowed for https only", http.StatusForbidden)
 		return
@@ -783,26 +792,36 @@ func imageProxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "proxy allowed only for i.pinimg.com", http.StatusForbidden)
 		return
 	}
+
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
-	req, err := http.NewRequestWithContext(ctx, "GET", parsed.String(), nil)
+
+	var req *http.Request
+	if useImageBackend() {
+		backendURL := imageBackendBase + "/fetch?url=" + url.QueryEscape(parsed.String())
+		req, err = http.NewRequestWithContext(ctx, "GET", backendURL, nil)
+	} else {
+		req, err = http.NewRequestWithContext(ctx, "GET", parsed.String(), nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0")
+	}
 	if err != nil {
 		http.Error(w, "failed", http.StatusBadGateway)
 		return
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0")
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		http.Error(w, "failed to fetch", http.StatusBadGateway)
 		return
 	}
 	defer resp.Body.Close()
-	if ct := resp.Header.Get("Content-Type"); ct != "" {
-		w.Header().Set("Content-Type", ct)
+
+	for _, h := range []string{"Content-Type", "Cache-Control", "ETag", "Last-Modified"} {
+		if v := resp.Header.Get(h); v != "" {
+			w.Header().Set(h, v)
+		}
 	}
-	if cc := resp.Header.Get("Cache-Control"); cc != "" {
-		w.Header().Set("Cache-Control", cc)
-	}
+
 	w.WriteHeader(resp.StatusCode)
 	bufPtr := copyBufPool.Get().(*[]byte)
 	buf := *bufPtr
@@ -868,16 +887,19 @@ func thumbImageProxyHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "url required", http.StatusBadRequest)
 		return
 	}
+
 	orig, err := url.QueryUnescape(uq)
 	if err != nil {
 		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
 	}
+
 	parsed, err := url.Parse(orig)
 	if err != nil {
 		http.Error(w, "invalid url", http.StatusBadRequest)
 		return
 	}
+
 	if parsed.Scheme != "https" {
 		http.Error(w, "proxy allowed for https only", http.StatusForbidden)
 		return
@@ -895,12 +917,23 @@ func thumbImageProxyHandler(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 20*time.Second)
 	defer cancel()
 
-	req, err := http.NewRequestWithContext(ctx, "GET", parsed.String(), nil)
+	var req *http.Request
+	if useImageBackend() {
+		backendURL := fmt.Sprintf(
+			"%s/thumb?url=%s&w=%d",
+			imageBackendBase,
+			url.QueryEscape(parsed.String()),
+			targetW,
+		)
+		req, err = http.NewRequestWithContext(ctx, "GET", backendURL, nil)
+	} else {
+		req, err = http.NewRequestWithContext(ctx, "GET", parsed.String(), nil)
+		req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0")
+	}
 	if err != nil {
 		http.Error(w, "failed", http.StatusBadGateway)
 		return
 	}
-	req.Header.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64; rv:145.0) Gecko/20100101 Firefox/145.0")
 
 	resp, err := httpClient.Do(req)
 	if err != nil {
@@ -909,6 +942,22 @@ func thumbImageProxyHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	defer resp.Body.Close()
 
+	// If backend is enabled, trust its output.
+	if useImageBackend() {
+		for _, h := range []string{"Content-Type", "Cache-Control", "ETag", "Last-Modified"} {
+			if v := resp.Header.Get(h); v != "" {
+				w.Header().Set(h, v)
+			}
+		}
+		w.WriteHeader(resp.StatusCode)
+		bufPtr := copyBufPool.Get().(*[]byte)
+		buf := *bufPtr
+		_, _ = io.CopyBuffer(w, resp.Body, buf)
+		copyBufPool.Put(bufPtr)
+		return
+	}
+
+	// Original direct-fetch thumbnail logic
 	data, err := io.ReadAll(resp.Body)
 	if err != nil {
 		http.Error(w, "failed to read", http.StatusBadGateway)
