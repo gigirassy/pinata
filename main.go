@@ -336,61 +336,7 @@ func getThemeVars(r *http.Request) (string, string) {
 }
 
 // ---------- CSS (uses CSS vars; defaults are present but overridden per-request via inline style) ----------
-const cssContent = `
-:root{
-  --bg:#0b0f17;
-  --muted:#94a3b8;
-  --text:#e6e6ff;
-  --accent:#7c3aed;  /* default; overridden by inline style */
-  --accent-rgba: rgba(124,58,237,0.12);
-  --img-scale: 1;
-}
-*{box-sizing:border-box}
-html,body{height:100%}
-body{margin:0;padding:20px;background:linear-gradient(180deg,#071020 0%,var(--bg) 100%);color:var(--text);font-family:ui-monospace,Menlo,Monaco,monospace}
-a{color:inherit}
-.header{display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap}
-.brand{font-size:20px;font-weight:700;color:var(--accent);text-decoration:none}
-.search-box{margin-left:auto;display:flex;gap:8px;align-items:center;flex:0 1 auto}
-.search-block{width:100%;display:flex;gap:8px;margin-top:14px}
-.search-inline{display:flex;gap:8px;align-items:center;min-width:0}
-input[type="text"]{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;color:var(--text);min-width:120px;border-radius:8px;outline:none}
-button[type="submit"],.btn-save{background:linear-gradient(90deg,var(--accent),#5b21b6);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}
-.btn-save{font-weight:600}
-
-/* NOTE: column-width now scales with --img-scale so the image/card width grows by percentage */
-.img-container { column-width: calc(260px * var(--img-scale)); column-gap: 16px; width: 100%; max-width: 1400px; margin-top: 18px; }
-
-/* card sizing driven by column width; image fills the card without transform (no zoom) */
-.card { display:inline-block; width:100%; margin:0 0 16px; border-radius:10px; overflow:hidden; background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.02)); box-shadow:0 6px 18px rgba(3,7,18,0.6); border:1px solid rgba(124,58,237,0.06); break-inside: avoid; -webkit-column-break-inside: avoid; -moz-column-break-inside: avoid; min-height:0; position:relative; }
-.card img { display:block; width:100%; height:auto; object-fit:cover; background:#08101a; /* removed transform scale to avoid zooming */ }
-
-.card-controls { position:absolute; top:8px; right:8px; display:flex; gap:8px; align-items:center; }
-.btn-save-mini { background: rgba(0,0,0,0.45); border:1px solid rgba(255,255,255,0.06); color: var(--text); padding:6px; border-radius:999px; cursor:pointer; font-weight:700; display:inline-flex; align-items:center; justify-content:center; width:34px; height:34px; text-decoration:none; }
-.magnifier{background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.06);color:var(--text);padding:6px;border-radius:999px;font-size:14px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}
-.bookmarks{margin-left:12px;color:var(--muted);font-size:14px}
-.bookmark-list{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}
-.bookmark-pill{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.04);font-size:13px;display:flex;gap:6px;align-items:center}
-.bookmark-pill form{display:inline}
-.bookmark-remove-btn{background:transparent;border:none;color:#ff7b7b;font-weight:700;cursor:pointer;padding:0 6px}
-.export-form{margin-top:12px;display:flex;gap:8px;align-items:center}
-.pagination{text-align:center;margin:26px 0}
-.pagination a{color:var(--accent);text-decoration:none;padding:8px 12px;border-radius:8px;border:1px solid rgba(124,58,237,0.12);background:rgba(124,58,237,0.02)}
-.footer-note{color:var(--muted);font-size:12px;margin-top:22px}
-
-/* Mobile: scale base column width by the same variable */
-@media (max-width:640px){
-  body{padding:12px;font-size:18px}
-  .brand{font-size:22px}
-  input[type="text"]{min-width:120px;padding:12px 14px;font-size:16px}
-  button[type="submit"],.btn-save{padding:10px 14px;font-size:16px;border-radius:10px}
-  .img-container{ column-width: calc(180px * var(--img-scale)); column-gap:12px }
-  .search-block{gap:10px;flex-direction:column}
-  .search-inline{width:100%}
-  .search-box{margin-left:0;width:100%}
-  .bookmarks{order:3;width:100%;margin-top:8px}
-}
-`
+const cssContent = `:root{--bg:#0b0f17;--muted:#94a3b8;--text:#e6e6ff;--accent:#7c3aed;--accent-rgba:rgba(124,58,237,0.12);--img-scale:1}*{box-sizing:border-box}html,body{height:100%}body{margin:0;padding:20px;background:linear-gradient(180deg,#071020 0%,var(--bg) 100%);color:var(--text);font-family:ui-monospace,Menlo,Monaco,monospace}a{color:inherit}.header{display:flex;gap:12px;align-items:center;margin-bottom:18px;flex-wrap:wrap}.brand{font-size:20px;font-weight:700;color:var(--accent);text-decoration:none}.search-box{margin-left:auto;display:flex;gap:8px;align-items:center;flex:0 1 auto}.search-block{width:100%;display:flex;gap:8px;margin-top:14px}.search-inline{display:flex;gap:8px;align-items:center;min-width:0}input[type="text"]{background:transparent;border:1px solid rgba(255,255,255,0.06);padding:8px 12px;color:var(--text);min-width:120px;border-radius:8px;outline:none}button[type="submit"],.btn-save{background:linear-gradient(90deg,var(--accent),#5b21b6);color:white;border:none;padding:8px 12px;border-radius:8px;cursor:pointer}.btn-save{font-weight:600}.img-container{column-width:calc(260px * var(--img-scale));column-gap:16px;width:100%;max-width:1400px;margin-top:18px}.card{display:inline-block;width:100%;margin:0 0 16px;border-radius:10px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,0.01),rgba(255,255,255,0.02));box-shadow:0 6px 18px rgba(3,7,18,0.6);border:1px solid rgba(124,58,237,0.06);break-inside:avoid;-webkit-column-break-inside:avoid;-moz-column-break-inside:avoid;min-height:0;position:relative}.card img{display:block;width:100%;height:auto;object-fit:cover;background:#08101a}.card-controls{position:absolute;top:8px;right:8px;display:flex;gap:8px;align-items:center}.btn-save-mini{background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.06);color:var(--text);padding:6px;border-radius:999px;cursor:pointer;font-weight:700;display:inline-flex;align-items:center;justify-content:center;width:34px;height:34px;text-decoration:none}.magnifier{background:rgba(0,0,0,0.45);border:1px solid rgba(255,255,255,0.06);color:var(--text);padding:6px;border-radius:999px;font-size:14px;width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;text-decoration:none}.bookmarks{margin-left:12px;color:var(--muted);font-size:14px}.bookmark-list{margin-top:10px;display:flex;gap:8px;flex-wrap:wrap}.bookmark-pill{background:rgba(255,255,255,0.03);padding:6px 8px;border-radius:999px;border:1px solid rgba(255,255,255,0.04);font-size:13px;display:flex;gap:6px;align-items:center}.bookmark-pill form{display:inline}.bookmark-remove-btn{background:transparent;border:none;color:#ff7b7b;font-weight:700;cursor:pointer;padding:0 6px}.export-form{margin-top:12px;display:flex;gap:8px;align-items:center}.pagination{text-align:center;margin:26px 0}.pagination a{color:var(--accent);text-decoration:none;padding:8px 12px;border-radius:8px;border:1px solid rgba(124,58,237,0.12);background:rgba(124,58,237,0.02)}.footer-note{color:var(--muted);font-size:12px;margin-top:22px}@media (max-width:640px){body{padding:12px;font-size:18px}.brand{font-size:22px}input[type="text"]{min-width:120px;padding:12px 14px;font-size:16px}button[type="submit"],.btn-save{padding:10px 14px;font-size:16px;border-radius:10px}.img-container{column-width:calc(180px * var(--img-scale));column-gap:12px}.search-block{gap:10px;flex-direction:column}.search-inline{width:100%}.search-box{margin-left:0;width:100%}.bookmarks{order:3;width:100%;margin-top:8px}}`
 
 // ---------- handlers ----------
 
@@ -576,7 +522,7 @@ func indexHandler(w http.ResponseWriter, r *http.Request) {
 		_, _ = io.WriteString(w, `<option value="`+strconv.Itoa(v)+`"`+sel+`>`+strconv.Itoa(v)+`%</option>`)
 	}
 	_, _ = io.WriteString(w, `</select></label>`)
-	_, _ = io.WriteString(w, `<input type="hidden" name="next" value="/"> <button type="submit" class="btn-save">Apply</button></form></div>`)
+	_, _ = io.WriteString(w, `<input type="hidden" name="next" value="/"><button type="submit" class="btn-save">Apply</button></form></div>`)
 
 	// bookmarks shown only on index
 	if bookmarkingEnabled {
@@ -1150,7 +1096,7 @@ func bookmarksExportHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "failed to export", http.StatusInternalServerError)
 		return
 	}
-	w.Header().Set("Content-Type", "application/json; charset=utf-8")
+	w.Header().Set("Content-Type", "application/json; charset=utf8")
 	w.Header().Set("Content-Disposition", "attachment; filename=\"pinata_bookmarks.json\"")
 	_, _ = w.Write(js)
 }
