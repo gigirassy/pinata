@@ -30,6 +30,7 @@ COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/ca-certifi
 
 ENV GOMEMLIMIT=15MiB \
     GOGC=20 \
+    THC_PORT_NAME=THC_PORT \
     THC_PORT=8080 \
     THC_PATH=/style.css
 
