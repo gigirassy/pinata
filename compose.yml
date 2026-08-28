@@ -22,8 +22,10 @@ services:
 
 # Autocompressing image proxy!
   pinata-proxy:
-    container_name: pinata-proxy
-    image: codeberg.org/gigirassy/image-proxy:latest
+    container_name: pinata_proxy
+    build: image-proxy/Dockerfile.custom
+# prebuilt, although the dockerfile provides more optimization
+#    image: codeberg.org/gigirassy/image-proxy:latest
     ports:
       - "127.0.0.1:45233:8081"
     networks:
