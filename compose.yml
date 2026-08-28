@@ -23,7 +23,9 @@ services:
 # Autocompressing image proxy!
   pinata-proxy:
     container_name: pinata_proxy
-    build: image-proxy/Dockerfile.custom
+    build:
+      context: ./image-proxy
+      dockerfile: Dockerfile.custom
 # prebuilt, although the dockerfile provides more optimization
 #    image: codeberg.org/gigirassy/image-proxy:latest
     ports:
