@@ -1,0 +1,3 @@
+[submodule "image-proxy"]
+	path = image-proxy
+	url = https://codeberg.org/gigirassy/image-proxy
