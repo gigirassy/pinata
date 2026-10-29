@@ -32,8 +32,7 @@ Port 8080 is needed to run with this method; Docker is most recommended if that 
 ### Compose (recommended)
 
 * Clone this repo **with submodules**. ``git clone https://codeberg.org/gigirassy/pinata/ --recurse-submodules``
-* Tweak ``compose.yml`` as you see fit and follow instructions if you want to enable bookmarks. This includes using the prebuilt image proxy image if your server can't handle heavy compiling with LTO, native optimizations, and all that...or
-* Comment out image proxy backend and PINATA_IMAGE_BACKEND environment variable if memory is a concern.
-* (cool bug facts: a custom-compiled image proxy can make image compression faster by up to 0.20 seconds!)
+* Tweak ``compose.yml`` as you see fit and follow instructions if you want to enable bookmarks.
+* Comment out image proxy backend and PINATA_IMAGE_BACKEND environment variable if memory or compilation is a concern.
 * ``docker compose up -d``
 * ``docker compose pull && cd image-proxy && git pull && cd .. && docker compose up -d --build`` to update.
