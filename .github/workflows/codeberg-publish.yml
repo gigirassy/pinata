@@ -3,7 +3,7 @@ name: Build and Push Multi-Arch Container
 
 env:
   REGISTRY_HOST: forge.blitzw.in
-  REGISTRY_REPO: gigirassy/pinata
+  REGISTRY_REPO: nune/pinata
 
 on:
   push:
