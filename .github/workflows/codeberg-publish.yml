@@ -2,7 +2,7 @@
 name: Build and Push Multi-Arch Container
 
 env:
-  REGISTRY_HOST: codeberg.org
+  REGISTRY_HOST: forge.blitzw.in
   REGISTRY_REPO: gigirassy/pinata
 
 on:
